@@ -168,17 +168,18 @@ counting `True` as one unit.
 Needs [Switch Console](https://docs.switchagents.ai/) with a local server
 and its bundled Mattermost (Docker).
 
+First record what was shipped to whom, which is the firm's distribution
+data and the thing a recall is reconciled against:
+
 ```bash
-python3 scripts/register_relay.py            # register the relay bot
-python3 scripts/provision.py --save-only     # save the template to the server
 python3 -m closeout.cli ship --recall F-0616-2018 \
     --consignee "Westside Distributors" --units 4278
 python3 -m closeout.cli ship --recall F-0616-2018 \
     --consignee "Midtown Pharmacy" --units 1000
 ```
 
-Then run the **`closeout-recall-room`** template from Console's Templates
-view with:
+Then **Templates → Import template** in Console, choose
+`closeout.template.yaml` from this repo, and run it with:
 
 | Param | Value |
 |---|---|
@@ -187,8 +188,15 @@ view with:
 | `product` | `Nyblad Orchards whole fresh apples, possible Listeria (Class I)` |
 | `project_dir` | your clone of this repo |
 
-Credentials are written to `~/.config/closeout/relay.json` at mode 0600 and
-are never printed.
+The relay bot is separate, and only needed to post the FDA notice into the
+room:
+
+```bash
+python3 scripts/register_relay.py     # writes ~/.config/closeout/relay.json, 0600
+python3 scripts/provision.py --save-only   # saves the template over the API instead of importing it
+```
+
+Credentials are written at mode 0600 and are never printed.
 
 ## Honest limits
 
