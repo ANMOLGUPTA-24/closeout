@@ -276,11 +276,18 @@ Credentials are written at mode 0600 and are never printed.
 
 ## Honest limits
 
-- **The template must be run from Switch Console, not headlessly.**
-  `run_template` from a plain registered agent fails with
-  `machine_unresolved`: creating managed agents needs an agent-controller
-  machine and the "can manage agents" capability. Console is that machine.
-  Everything else here is scriptable; this step is not.
+- **The template must be run from Switch Console, not headlessly.** I tried
+  three ways and documented all of them. `run_template` from a registered
+  agent fails with `machine_unresolved` — creating managed agents needs the
+  "can manage agents" capability and a machine. The gateway API, which is
+  what Console itself calls, signs in and provisions rooms fine, but
+  `/rooms/from-yaml` rejects a document carrying an `agents:` block
+  ("Unknown top-level key(s): agents"). And a managed agent is created by
+  Console's own process pulling assignments, not by a server route; the
+  hosted-machine endpoints are for SSH and cloud hosts. So the agents need
+  Console. `scripts/console_provision.py` does the teardown either side of
+  a run, which is otherwise a dozen clicks and leaves orphaned Mattermost
+  channels behind.
 - **Lot-to-consignee quantities are synthetic.** The recall record is real,
   and so is its 9,600-bottle total, but openFDA does not publish who
   received which lot. The split across two consignees is invented, and
