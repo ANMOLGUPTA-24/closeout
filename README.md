@@ -40,6 +40,11 @@ came back. The recall was closed without anyone having to state it.
 
 That is how 36% passes for success.
 
+I sampled 3,000 real Class I food recalls through the openFDA API:
+**86.9% state a numeric quantity shipped. 0% state how much came back** —
+not because the field is usually blank, but because the enforcement schema
+has no such field. It is not missing data. It is a missing concept.
+
 ## What Closeout does
 
 Every unit shipped to a consignee must end up in exactly one of four
@@ -47,14 +52,21 @@ buckets — **returned**, **destroyed**, **quarantined** off-sale, or
 **dispensed** and therefore unrecoverable. The residue is unaccounted
 product: it is somewhere in the market and nobody can point to it.
 
-Closure requires all three of:
+Three different things can be wrong with an account, and they are not the
+same thing:
 
-1. zero unaccounted units across every consignee,
-2. a named final account from every consignee,
-3. no contradiction outstanding.
+| | What it means | What catches it |
+|---|---|---|
+| **Unaccounted** | The numbers do not add up to what was shipped. | Arithmetic. |
+| **Unevidenced** | The numbers add up, but a count rests on nothing. "We returned 2,878" with no receipt is a sentence, not a fact. | Requiring a document per non-zero count. |
+| **Disputed** | The numbers add up, are evidenced, and disagree with the firm's own receiving log. | Comparing against the other side of the transaction. |
 
-A consignee reporting the recall complete while short of units is a
-*contradiction*, not a closure. Saying it a second time does not help.
+**Self-consistency is the weakest of the three.** A consignee that wants a
+recall closed early can produce internally consistent numbers all day.
+
+Closure requires all of: zero unaccounted units, a named final account from
+every consignee, every non-zero count citing a document, and nothing in
+dispute with the receiving log.
 
 **Accounted for is not the same as recovered.** Dispensed units are
 explained but were never got back, so the recovery rate is the honest
@@ -102,7 +114,7 @@ flowchart TB
 | **One-way links** | Consignee rooms link **to** the master room; the master never links back. | A room's name is visible to everyone in a room that links to it. Linking outward would disclose the whole consignee list to every consignee. |
 | **Room documents** | The closure rule ships as a room doc. | Every agent that joins is briefed on the rule, so nobody has to ask what "closed" means. |
 | **Agent as event relay** | `closeout-relay` posts the FDA notice via `POST /agents/{id}/message`. | Switch has no scheduler and no inbound webhook (the generic-webhook platform is [open issue #799](https://github.com/sandbox-quantum/switch/issues/799)), so an outside event reaches a room only through a registered agent. |
-| **Templates** | `closeout.template.yaml` builds the whole group — 3 rooms, 3 agents, roles, docs, links — in one run. | The structure is reproducible, not hand-assembled. |
+| **Templates, generated** | `scripts/generate_template.py` builds the whole group — one room and one liaison per consignee, plus roles, docs and links — from the distribution list. | A Class I recall fans out to hundreds of consignees. Hand-written YAML caps the recall at however many rooms somebody felt like typing; the generator is tested at twelve. |
 
 **Take Switch away and this is not a worse version of the same thing.** It
 is a single channel in which every consignee reads every other consignee's
@@ -131,26 +143,52 @@ cd closeout
 ./scripts/demo.sh
 ```
 
-That runs both halves of the story end to end. It exits non-zero if a
-recall is ever closed when it should not be, so it doubles as an
-integration test.
+It exits non-zero if a recall is ever closed when it should not be, so it
+doubles as an integration test. It walks three refusals, each catching
+something the one before it could not.
 
-**Run B is the point.** Westside returns 2,878 of 4,278 units and states
-the recall is complete. Closure is refused as a contradiction. Then
-`@regulatory` tries to authorize closure anyway, and is refused too:
+**Refusal 1 — the numbers do not add up.** Westside returns 2,878 of 4,278
+units and states the recall is complete:
 
 ```
 CLOSURE REFUSED
   - Westside Distributors: reports the recall complete while 1400 of 4278
     units are still unaccounted for
-  - 1400 units unaccounted for across 1 consignee(s)
 ```
 
-Authority is not arithmetic.
+Then `@regulatory` tries to authorize closure anyway, and is refused too.
+**Authority is not arithmetic.**
 
-**Run A** is what closing honestly looks like: the account balances, and
-the recall closes at a **90.5%** recovery rate with 500 units explicitly
-signed for as never recovered.
+**Refusal 2 — the numbers add up and rest on nothing.** Westside finds the
+rest: 900 destroyed, 300 quarantined, 200 dispensed. 4,278 of 4,278. But
+only the returns cite a document:
+
+```
+CLOSURE REFUSED
+  - Westside Distributors: claims 900 units destroyed citing no document
+    and it is counted as recovered
+```
+
+**Refusal 3 — every count is evidenced, and one is still wrong.** Westside
+produces the certificate and the log. Then the firm checks its own
+receiving record:
+
+```
+CLOSURE REFUSED
+  - Westside Distributors: claims 2878 units returned, but the firm's
+    receiving log records 2600 arriving back: 278 units are claimed as
+    returned and were never received
+```
+
+No amount of self-consistency finds that. It takes the other side of the
+transaction.
+
+**The resolution is worse than the dispute.** Those 278 units were never
+sent back — they were sold before the recall notice reached the shop floor
+and written up as returns afterwards. They do not move from "returned" to
+"found". They move from *recovered* to *in someone's kitchen*, and the
+recall closes at **85.3%** rather than the 90.5% the tidy version claimed,
+with 778 units signed for as never recovered.
 
 ### Tests
 
@@ -159,9 +197,11 @@ python3 -m venv .venv && .venv/bin/pip install pytest
 .venv/bin/python -m pytest tests/ -q
 ```
 
-19 tests, weighted toward the refusal paths: false completion, overage,
-duplicate accounts, silence-is-not-completion, and a guard against Python
-counting `True` as one unit.
+44 tests, weighted toward the refusal paths: false completion, overage,
+unevidenced counts, disputed returns in both directions, duplicate
+accounts, silence-is-not-completion, a state file written before a field
+existed, a recall number that tries to escape the state directory, and a
+guard against Python counting `True` as one unit.
 
 ## Running it in Switch
 
@@ -178,8 +218,16 @@ python3 -m closeout.cli ship --recall F-0616-2018 \
     --consignee "Midtown Pharmacy" --units 1000
 ```
 
+Generate the template from that list — add a third consignee and you get a
+third isolated room without touching any YAML:
+
+```bash
+python3 scripts/generate_template.py --recall F-0616-2018 \
+    --product "Nyblad Orchards whole fresh apples, possible Listeria (Class I)"
+```
+
 Then **Templates → Import template** in Console, choose
-`closeout.template.yaml` from this repo, and run it with:
+`closeout.template.yaml`, and run it with:
 
 | Param | Value |
 |---|---|
@@ -212,9 +260,13 @@ Credentials are written at mode 0600 and are never printed.
   the first record I pulled had an empty `product_quantity` and a
   `code_info` of "No Lot code on label", which is itself much of why recalls
   cannot be reconciled today.
-- **Two consignees, not a distribution tree.** A real Class I recall fans
-  out through distributors to hundreds of retailers, and sub-consignees are
-  not modelled.
+- **Flat consignee list, not a distribution tree.** The template generates
+  a room per consignee and is tested at twelve, but a real recall fans out
+  *through* distributors to retailers. Sub-consignees — a distributor's own
+  customers — are not modelled, and that is where recalls actually get lost.
+- **The firm's receiving log is trusted as given.** It is independent of
+  the consignee, which is the point, but nothing corroborates it in turn.
+  A firm motivated to look good could under-record just as easily.
 - **Nothing here talks to a regulator.** No FDA submission, no 21 CFR 7
   workflow, no electronic signature. `@regulatory` is a role in a chat room,
   not an identity a regulator would accept.
