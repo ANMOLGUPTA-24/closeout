@@ -20,37 +20,55 @@ Run this:
 python3 -m closeout.cli fetch --recall D-1572-2020 --offline
 ```
 
-That is a real FDA Class I drug recall. SkinGuard 24 hand sanitizer,
-**"all lots labeled to contain methanol"**, **9,600 bottles**, distributed
-**nationwide**, August 2020.
+That is a real FDA **Class I** drug recall: SkinGuard 24 hand sanitizer,
+**9,600 bottles**, distributed **nationwide**, August 2020. Status:
+**Terminated**.
 
-Methanol is lethal swallowed and causes permanent blindness short of that.
-Over two months in 2020, CDC reviewed 15 hospitalisations from
-methanol-contaminated hand sanitizer across two states: **four people died
-and three were left permanently blind**
-([MMWR 69(32):1070–1073](https://pubmed.ncbi.nlm.nih.gov/32790662/)).
-Those cases are not attributed to this particular recall — they are why
-this entire product category is Class I.
+Be precise about what it is, because the dramatic version would be wrong.
+This is not a contamination scandal. The firm *declared* the methanol — the
+recall reason is "Marketed without an Approved NDA/ANDA; product labeled to
+contain 0.56% methanol making it an unapproved new drug". FDA classified it
+Class I all the same, because Class I means a reasonable probability of
+serious health consequences, and methanol has no place in something rubbed
+on skin all day. Separately that year, CDC reviewed 15 hospitalisations
+from *ingesting* methanol-containing hand sanitizer in two states: four
+people died and three were discharged with vision impairment
+([MMWR 69(32):1070–1073](https://pubmed.ncbi.nlm.nih.gov/32790662/)). Those
+were other products and other firms. No published figure attributes harm to
+these 9,600 bottles.
 
-So: how many of the 9,600 bottles came back?
+**That ordinariness is the point.** This is a routine Class I recall, and
+even a routine one was closed without anyone recording how many bottles
+came back.
 
-The record does not say. Its status is **Terminated** — closed — and there
-is no field anywhere in it for how much was recovered.
+Because the record cannot say. There is no field for it. I sampled 3,000
+Class I food recalls through the openFDA API — reproduce it with
+`python3 scripts/survey_recalls.py`:
 
-I sampled 3,000 Class I food recalls through the openFDA API to check
-whether this is an outlier. **86.9% state a numeric quantity shipped. None
-state how much came back**, because the enforcement schema has no such
-field. It is not missing data. It is a missing concept.
+```
+  state a numeric quantity shipped : 2606 (86.9%)
+  distinct fields across the sample: 25
+  fields that could carry how much came back: NONE
+```
 
-The consequences are measurable:
+**86.9% say how much went out. None can say how much came back.** It is not
+missing data. It is a missing concept.
 
-- US GAO found only about **36% of recalled food** was ever recovered, with
-  FDA verification averaging **31 days** — longer than the shelf life of the
-  product being recalled
-  ([GAO-05-51](https://webarchive.library.unt.edu/eot2008/20090813021452/http://gao.gov/products/GAO-05-51))
-- HHS OIG found an average of **57 days** for a recall to even begin after
-  FDA knew about the hazard
-  ([OIG, 2017](https://www.oversight.gov/sites/default/files/documents/reports/2017-09/11501500.pdf))
+What that costs, with the caveats a careful reader should have:
+
+- US GAO found only about **36% of recalled food** was ever recovered, and
+  that FDA verification checks averaged **31 days** — longer than the shelf
+  life of some recalled product
+  ([GAO-05-51](https://www.gao.gov/products/gao-05-51)). The recovery figure
+  is from 2003-era data and the 31 days comes from 10 recalls examined in
+  depth, so treat it as an order of magnitude, not a current measurement.
+- HHS OIG found firms took an average of **57 days** to begin a recall after
+  FDA learned of the hazard, median 29, ranging to 303
+  ([A-01-16-01502, Dec 2017](https://oig.hhs.gov/oas/reports/region1/11601502.asp)).
+  That is 30 judgmentally-selected recalls from 2012–2015, and **FDA
+  disputed it**, saying most recalls begin within four days — a dispute OIG
+  attributed partly to FDA having no reliable record of initiation dates,
+  which is itself the same class of problem as this project's.
 
 ## What Closeout does
 
@@ -119,7 +137,7 @@ flowchart TB
 | **Room membership** | One private room per consignee. The registrar is a member of **none** of them. | A consignee must not see a competitor's counts. The registrar structurally *cannot* read a consignee's working discussion, so it cannot be talked into helping one massage its numbers. Enforced by Switch, not by a prompt. |
 | **Exclusive roles** | `@regulatory` is `exclusive: true`; `@comms` is shared. | Closure is a legal act by one named person. Switch records who answered, which is the audit trail a regulator needs. |
 | **One-way links** | Consignee rooms link **to** the master room; the master never links back. | A room's name is visible to everyone in a room that links to it. Linking outward would disclose the whole consignee list to every consignee. |
-| **Role verification** | Before accepting a closure instruction, the registrar reads the room's roles and checks the instructing person is the current holder of the exclusive `regulatory` role. | A name typed into a chat message is not an authorisation. The role is, and Switch is what knows who holds it. |
+| **Role verification** | Before accepting a closure instruction, the registrar reads the room's roles and checks the instructing person holds the exclusive `regulatory` role. | A name typed into a chat message is not an authorisation; the role is, and Switch is what knows who holds it. **This one is an instruction, not an enforcement** — the agent is told to check. The membership boundary above is the part Switch enforces whatever the agent does. |
 | **Room documents** | The closure rule and the distribution list ship as a room doc; on closure the registrar writes a **closure certificate** as a document. | Every agent that joins is briefed. And a chat message scrolls away — somebody will come looking for how a recall was closed in two years. |
 | **Agent as event relay** | `closeout-relay` posts the FDA notice via `POST /agents/{id}/message`. | Switch has no scheduler and no inbound webhook ([issue #799](https://github.com/sandbox-quantum/switch/issues/799)), so an outside event reaches a room only through a registered agent. |
 | **Templates, generated** | `scripts/generate_template.py` builds the whole group — one room and one liaison per consignee, plus roles, docs and links — from the distribution list. | A Class I recall fans out to hundreds of consignees. Hand-written YAML caps the recall at however many rooms somebody felt like typing; the generator is tested at twelve. |
@@ -307,11 +325,16 @@ Credentials are written at mode 0600 and are never printed.
   its job. Its instructions forbid carrying anything else across, and
   instructions are not an enforcement mechanism. The registrar's isolation
   *is* enforced, because it is a member of no consignee room at all.
-- **The CDC deaths are not this recall's deaths.** Four deaths and three
-  blindings are what methanol-contaminated sanitizer did in two states over
-  two months in 2020. No published figure attributes harm to these
-  particular 9,600 bottles — which is rather the point, since nobody knows
-  where 1,400 of them went.
+- **The CDC cases are not this recall's cases**, and this recall is not a
+  poisoning story. Its violation is a labelling and unapproved-drug one:
+  the methanol was declared on the label. The four deaths and three vision
+  impairments were people who *drank* other methanol-containing sanitizers.
+  Both facts are in the problem statement above rather than only here,
+  because a reader who learns them later would be right to distrust
+  everything else.
+- **Nobody is claiming these 9,600 bottles hurt anyone.** The claim is
+  narrower and duller: a Class I recall was closed and no one recorded what
+  came back, which is true of every recall in the database.
 
 ## AI disclosure
 
