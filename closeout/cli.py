@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from closeout.recon import reconcile
+from closeout.recon import BUCKETS, reconcile
 from closeout.store import RecallStore
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -41,6 +41,10 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                     "unaccounted": result.unaccounted,
                     "recovered": result.recovered,
                     "recovery_rate": round(result.recovery_rate, 4),
+                    "evidenced_recovered": result.evidenced_recovered,
+                    "evidenced_recovery_rate": round(
+                        result.evidenced_recovery_rate, 4
+                    ),
                     "may_close": result.may_close,
                     "blockers": result.blockers(),
                     "findings": [
@@ -63,6 +67,11 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     print(f"  accounted     {result.accounted}")
     print(f"  unaccounted   {result.unaccounted}")
     print(f"  recovered     {result.recovered}  ({_fmt_rate(result.recovery_rate)})")
+    print(
+        f"  evidenced     {result.evidenced_recovered}  "
+        f"({_fmt_rate(result.evidenced_recovery_rate)} of shipped, "
+        "recovery backed by a document)"
+    )
     print()
 
     for report in result.reports:
@@ -71,6 +80,13 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
             f"  {report.consignee:<26} shipped {report.shipped:>6}  "
             f"unaccounted {report.outstanding:>6}  [{state}]"
         )
+        gap = report.returns_gap
+        if gap:
+            print(
+                f"  {'':<26} returns claimed "
+                f"{report.disposition.returned.units}, firm logged "
+                f"{report.independent_returns} (gap {gap:+d})"
+            )
     print()
 
     if result.may_close:
@@ -98,17 +114,32 @@ def cmd_file(args: argparse.Namespace) -> int:
         )
         return 2
 
+    counts = {bucket: getattr(args, bucket) for bucket in BUCKETS}
+    evidence = {bucket: getattr(args, f"{bucket}_evidence") for bucket in BUCKETS}
+
     store.file_account(
         args.consignee,
-        returned=args.returned,
-        destroyed=args.destroyed,
-        quarantined=args.quarantined,
-        dispensed=args.dispensed,
+        counts=counts,
+        evidence=evidence,
         attested_by=args.attested_by,
         claims_complete=args.claims_complete,
     )
+    uncited = [b for b in BUCKETS if counts[b] and not evidence[b]]
     print(f"Filed {args.consignee}'s account, attested by {args.attested_by}.")
+    if uncited:
+        print(f"  cites no document for: {', '.join(uncited)}")
     return cmd_reconcile(args)
+
+
+def cmd_receipt(args: argparse.Namespace) -> int:
+    """Record the firm's own receiving log for one consignee."""
+    store = RecallStore(args.recall, root=args.root)
+    store.record_receipt(args.consignee, args.units)
+    print(
+        f"Firm's receiving log: {args.units} units recorded back from "
+        f"{args.consignee}."
+    )
+    return 0
 
 
 def cmd_ship(args: argparse.Namespace) -> int:
@@ -213,10 +244,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("file", help="file a consignee's final account")
     p.add_argument("--recall", required=True)
     p.add_argument("--consignee", required=True)
-    p.add_argument("--returned", type=int, default=0)
-    p.add_argument("--destroyed", type=int, default=0)
-    p.add_argument("--quarantined", type=int, default=0)
-    p.add_argument("--dispensed", type=int, default=0)
+    for bucket in BUCKETS:
+        p.add_argument(f"--{bucket}", type=int, default=0)
+        p.add_argument(
+            f"--{bucket}-evidence",
+            dest=f"{bucket}_evidence",
+            default=None,
+            help=f"document backing the {bucket} count, e.g. returns-receipt/RR-4471",
+        )
     p.add_argument("--attested-by", dest="attested_by", required=True)
     p.add_argument(
         "--claims-complete",
@@ -226,6 +261,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_file)
+
+    p = sub.add_parser(
+        "receipt",
+        help="record the firm's own receiving log for a consignee",
+    )
+    p.add_argument("--recall", required=True)
+    p.add_argument("--consignee", required=True)
+    p.add_argument("--units", type=int, required=True)
+    p.set_defaults(func=cmd_receipt)
 
     p = sub.add_parser("close", help="authorize closure (regulatory sign-off)")
     p.add_argument("--recall", required=True)

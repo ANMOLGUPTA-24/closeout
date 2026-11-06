@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from closeout.recon import ConsigneeReport, Disposition
+from closeout.recon import BUCKETS, ConsigneeReport, Count, Disposition
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent / "data" / "recalls"
 
@@ -35,18 +35,31 @@ class RecallStore:
 
     # --- persistence ------------------------------------------------------
 
+    def _empty(self) -> dict[str, Any]:
+        return {
+            "recall_number": self.recall_number,
+            "product": "",
+            "shipments": {},
+            "accounts": {},
+            "receiving_log": {},
+            "history": [],
+            "closure": None,
+        }
+
     def load(self) -> dict[str, Any]:
+        """Read the recall's state, filling in any key the file predates.
+
+        A file written before a key existed is missing it, and a recall
+        outlives the code that first wrote it. Backfilling here means an
+        older file degrades to "nothing recorded yet" for that key rather
+        than raising halfway through a reconciliation.
+        """
+        state = self._empty()
         if not self.path.exists():
-            return {
-                "recall_number": self.recall_number,
-                "product": "",
-                "shipments": {},
-                "accounts": {},
-                "history": [],
-                "closure": None,
-            }
+            return state
         with self.path.open() as fh:
-            return json.load(fh)
+            state.update(json.load(fh))
+        return state
 
     def save(self, state: dict[str, Any]) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -69,10 +82,8 @@ class RecallStore:
         self,
         consignee: str,
         *,
-        returned: int = 0,
-        destroyed: int = 0,
-        quarantined: int = 0,
-        dispensed: int = 0,
+        counts: dict[str, int],
+        evidence: dict[str, str | None],
         attested_by: str | None = None,
         claims_complete: bool = False,
     ) -> None:
@@ -83,14 +94,22 @@ class RecallStore:
             )
         state["accounts"][consignee] = {
             "consignee": consignee,
-            "returned": int(returned),
-            "destroyed": int(destroyed),
-            "quarantined": int(quarantined),
-            "dispensed": int(dispensed),
+            "counts": {b: int(counts.get(b, 0)) for b in BUCKETS},
+            "evidence": {b: (evidence.get(b) or None) for b in BUCKETS},
             "attested_by": attested_by,
             "claims_complete": bool(claims_complete),
             "filed_at": _now(),
         }
+        self.save(state)
+
+    def record_receipt(self, consignee: str, units: int) -> None:
+        """Record what the firm's own receiving log says came back.
+
+        This is the other side of the transaction, so it is kept apart from
+        anything the consignee filed and is never overwritten by it.
+        """
+        state = self.load()
+        state["receiving_log"][consignee] = int(units)
         self.save(state)
 
     def record_closure(self, authorized_by: str, recovery_rate: float) -> None:
@@ -112,21 +131,32 @@ class RecallStore:
         would let silence read as completion.
         """
         state = self.load()
+        receiving_log = state.get("receiving_log", {})
         out: list[ConsigneeReport] = []
         for consignee, shipped in sorted(state["shipments"].items()):
             account = state["accounts"].get(consignee, {})
+            counts = account.get("counts", {})
+            evidence = account.get("evidence", {})
             out.append(
                 ConsigneeReport(
                     consignee=consignee,
                     shipped=int(shipped),
                     disposition=Disposition(
-                        returned=int(account.get("returned", 0)),
-                        destroyed=int(account.get("destroyed", 0)),
-                        quarantined=int(account.get("quarantined", 0)),
-                        dispensed=int(account.get("dispensed", 0)),
+                        **{
+                            bucket: Count(
+                                int(counts.get(bucket, 0)),
+                                evidence.get(bucket),
+                            )
+                            for bucket in BUCKETS
+                        }
                     ),
                     attested_by=account.get("attested_by") or None,
                     claims_complete=bool(account.get("claims_complete", False)),
+                    independent_returns=(
+                        int(receiving_log[consignee])
+                        if consignee in receiving_log
+                        else None
+                    ),
                 )
             )
         return out
