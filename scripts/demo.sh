@@ -33,18 +33,20 @@ refuse_or_die() {
 rule "The regulator's record"
 cat <<'TXT'
 D-1572-2020 is a real FDA Class I drug recall: SkinGuard 24 hand sanitizer,
-"all lots labeled to contain methanol", 9,600 bottles, distributed
-nationwide. Its status is Terminated.
+9,600 bottles, distributed nationwide. Status: Terminated.
 
-Methanol is absorbed through skin and is lethal swallowed. Over two months
-in 2020, CDC reviewed 15 hospitalisations from methanol-contaminated hand
-sanitizer in two states: four people died and three were left permanently
-blind. (MMWR 69(32):1070-1073. Those cases are not attributed to this
-recall; they are why this entire product category is Class I.)
+Be precise about what it is. The firm declared the methanol -- the recall
+reason is an unapproved-drug and labelling violation, not a contamination
+scandal. FDA made it Class I anyway, because methanol has no business in
+something rubbed on skin all day. (Separately that year, CDC reviewed 15
+hospitalisations from people *drinking* methanol-containing sanitizers:
+four died, three were discharged with vision impairment. Other products,
+other firms. Nothing attributes harm to these 9,600 bottles.)
 
-So: how many of the 9,600 bottles came back?
+That ordinariness is the point. This is a routine Class I recall, and even
+a routine one was closed without anyone recording what came back.
 
-The record does not say. The enforcement schema has no field for it.
+Because the record cannot say it. The schema has no field for it.
 TXT
 run fetch --recall "$RECALL" --offline
 
