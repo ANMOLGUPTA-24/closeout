@@ -1,0 +1,132 @@
+"""Tests for the command line the agents actually run.
+
+Exit codes matter here: the demo script and the agents both branch on
+them, so a refusal that exits 0 would silently close a recall.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def cli(tmp_path):
+    def run(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "-m", "closeout.cli", "--root", str(tmp_path), *args],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+        )
+
+    return run
+
+
+@pytest.fixture
+def seeded(cli):
+    cli("ship", "--recall", "D-1", "--consignee", "Gulf Coast", "--units", "1000")
+    return cli
+
+
+def test_reconcile_exits_nonzero_when_closure_is_refused(seeded):
+    result = seeded("reconcile", "--recall", "D-1")
+
+    assert result.returncode == 1
+    assert "CLOSURE REFUSED" in result.stdout
+
+
+def test_reconcile_exits_zero_when_it_may_close(seeded):
+    seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "1000", "--returned-evidence", "rr/1",
+        "--attested-by", "someone",
+    )
+    result = seeded("reconcile", "--recall", "D-1")
+
+    assert result.returncode == 0
+    assert "MAY CLOSE" in result.stdout
+
+
+def test_close_refuses_and_exits_nonzero_while_short(seeded):
+    seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "400", "--returned-evidence", "rr/1",
+        "--attested-by", "someone",
+    )
+    result = seeded("close", "--recall", "D-1", "--authorized-by", "@regulatory")
+
+    assert result.returncode == 1
+    assert "CLOSURE REFUSED" in result.stderr
+
+
+def test_filing_for_an_unknown_consignee_is_refused(seeded):
+    """A typo must not silently create a consignee nobody shipped to."""
+    result = seeded(
+        "file", "--recall", "D-1", "--consignee", "Guulf Coast",
+        "--returned", "10", "--attested-by", "someone",
+    )
+
+    assert result.returncode == 2
+    assert "no shipment on record" in result.stderr
+
+
+def test_file_warns_when_a_count_cites_no_document(seeded):
+    result = seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "1000", "--attested-by", "someone",
+    )
+
+    assert "cites no document for: returned" in result.stdout
+
+
+def test_certificate_refuses_before_closure(seeded):
+    result = seeded("certificate", "--recall", "D-1")
+
+    assert result.returncode == 1
+    assert "has not been closed" in result.stderr
+
+
+def test_certificate_states_what_was_never_recovered(seeded):
+    seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "600", "--returned-evidence", "rr/1",
+        "--dispensed", "400", "--dispensed-evidence", "pos/1",
+        "--attested-by", "D. Okafor",
+    )
+    seeded("close", "--recall", "D-1", "--authorized-by", "M. Haddad")
+    result = seeded("certificate", "--recall", "D-1")
+
+    assert result.returncode == 0
+    assert "Recovered: **600** (60.0%)" in result.stdout
+    assert "Never recovered: **400**" in result.stdout
+    assert "rr/1" in result.stdout
+    assert "M. Haddad" in result.stdout
+
+
+def test_fetch_offline_reads_the_bundled_record():
+    result = subprocess.run(
+        [sys.executable, "-m", "closeout.cli", "fetch",
+         "--recall", "D-1572-2020", "--offline"],
+        cwd=REPO, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0
+    assert "9600 bottles" in result.stdout
+    assert "Terminated" in result.stdout
+
+
+def test_fetch_rejects_a_recall_number_it_cannot_route():
+    """openFDA serves drug, food and device reports separately."""
+    result = subprocess.run(
+        [sys.executable, "-m", "closeout.cli", "fetch", "--recall", "QQ-1"],
+        cwd=REPO, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 2
+    assert "D-, F- or Z-" in result.stderr

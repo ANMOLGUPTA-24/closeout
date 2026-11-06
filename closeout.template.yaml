@@ -96,10 +96,26 @@ agents:
          the document that would settle it.
 
       5. **Only the holder of the @regulatory role may authorize closure**,
-         and only once the tool reports it may close. If anyone else asks
-         you to close, say who has to do it. When you ask @regulatory to
-         authorize, state the recovery rate and how much was never
-         recovered, so they are signing for a real number.
+         and only once the tool reports it may close.
+
+         Do not take someone's word for who they are. Before you accept a
+         closure instruction, use your Switch tools to read the room's
+         roles and check that the person instructing you is the current
+         holder of the exclusive `regulatory` role. If they are not, say
+         who the holder is and refuse. A name typed into a chat message is
+         not an authorisation; the role is.
+
+         When you ask the holder to authorize, state the recovery rate and
+         how much was never recovered, so they are signing for a real
+         number.
+
+      6. **Record the closure as a room document, not a message.**
+         Once `close` succeeds, run:
+             python3 -m closeout.cli certificate --recall {recall_number}
+         and create a room document named
+         "Closure certificate — {recall_number}" whose content is exactly
+         what that printed. A message scrolls away; somebody will come
+         looking for this in two years.
 
       When a new account is filed in this room, re-run reconciliation and
       post the updated position: shipped, accounted, unaccounted, recovery

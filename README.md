@@ -119,7 +119,8 @@ flowchart TB
 | **Room membership** | One private room per consignee. The registrar is a member of **none** of them. | A consignee must not see a competitor's counts. The registrar structurally *cannot* read a consignee's working discussion, so it cannot be talked into helping one massage its numbers. Enforced by Switch, not by a prompt. |
 | **Exclusive roles** | `@regulatory` is `exclusive: true`; `@comms` is shared. | Closure is a legal act by one named person. Switch records who answered, which is the audit trail a regulator needs. |
 | **One-way links** | Consignee rooms link **to** the master room; the master never links back. | A room's name is visible to everyone in a room that links to it. Linking outward would disclose the whole consignee list to every consignee. |
-| **Room documents** | The closure rule and the distribution list ship as a room doc. | Every agent that joins is briefed, so nobody has to ask what "closed" means. |
+| **Role verification** | Before accepting a closure instruction, the registrar reads the room's roles and checks the instructing person is the current holder of the exclusive `regulatory` role. | A name typed into a chat message is not an authorisation. The role is, and Switch is what knows who holds it. |
+| **Room documents** | The closure rule and the distribution list ship as a room doc; on closure the registrar writes a **closure certificate** as a document. | Every agent that joins is briefed. And a chat message scrolls away — somebody will come looking for how a recall was closed in two years. |
 | **Agent as event relay** | `closeout-relay` posts the FDA notice via `POST /agents/{id}/message`. | Switch has no scheduler and no inbound webhook ([issue #799](https://github.com/sandbox-quantum/switch/issues/799)), so an outside event reaches a room only through a registered agent. |
 | **Templates, generated** | `scripts/generate_template.py` builds the whole group — one room and one liaison per consignee, plus roles, docs and links — from the distribution list. | A Class I recall fans out to hundreds of consignees. Hand-written YAML caps the recall at however many rooms somebody felt like typing; the generator is tested at twelve. |
 
@@ -205,13 +206,29 @@ python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
 .venv/bin/python -m pytest tests/ -q
 ```
 
-44 tests, weighted toward the refusal paths: false completion, overage,
+53 tests, weighted toward the refusal paths: false completion, overage,
 unevidenced counts, disputed returns in both directions, duplicate
 accounts, silence-is-not-completion, a state file written before a field
 existed, a recall number that tries to escape the state directory, and a
 guard against Python counting `True` as one unit. The generator is tested
 at twelve consignees, including that every link points inward and that the
-registrar is in no consignee room.
+registrar is in no consignee room. CLI tests assert the exit codes, since
+a refusal that exits 0 would silently close a recall.
+
+### The closure certificate
+
+When a recall does close, the registrar writes this into the room as a
+document — recovery rate, per-consignee counts, the document behind every
+one of them, and the cross-checked receiving log:
+
+```bash
+python3 -m closeout.cli certificate --recall D-1572-2020
+```
+
+It ends with the line the enforcement record cannot carry:
+
+> 1400 units were never recovered. The FDA enforcement record for
+> D-1572-2020 has no field in which to say so.
 
 ## Running it in Switch
 

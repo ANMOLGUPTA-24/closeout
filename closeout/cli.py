@@ -169,6 +169,76 @@ def cmd_close(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_certificate(args: argparse.Namespace) -> int:
+    """Emit the closure certificate for a recall that has been closed.
+
+    The registrar posts this into the room as a document rather than a
+    message, because a chat message scrolls away and a recall's closure is
+    the one thing someone will come looking for in two years.
+    """
+    store = RecallStore(args.recall, root=args.root)
+    state = store.load()
+    closure = state.get("closure")
+    if not closure:
+        print(
+            f"error: recall {args.recall} has not been closed, so there is "
+            "nothing to certify.",
+            file=sys.stderr,
+        )
+        return 1
+
+    result = reconcile(args.recall, store.reports())
+    never = result.shipped - result.recovered
+    lines = [
+        f"# Closure certificate — recall {args.recall}",
+        "",
+        f"Closed by **{closure['authorized_by']}** at {closure['closed_at']}.",
+        "",
+        f"- Shipped: **{result.shipped}**",
+        f"- Recovered: **{result.recovered}** ({_fmt_rate(result.recovery_rate)})",
+        f"- Never recovered: **{never}**",
+        "",
+        "## What each consignee accounted for",
+        "",
+        "| Consignee | Shipped | Returned | Destroyed | Quarantined | Dispensed | Attested by |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for report in result.reports:
+        counts = " | ".join(
+            str(getattr(report.disposition, bucket).units) for bucket in BUCKETS
+        )
+        lines.append(
+            f"| {report.consignee} | {report.shipped} | {counts} | "
+            f"{report.attested_by} |"
+        )
+    lines += [
+        "",
+        "## Evidence",
+        "",
+    ]
+    for report in result.reports:
+        for bucket in BUCKETS:
+            count = getattr(report.disposition, bucket)
+            if count.units:
+                lines.append(
+                    f"- {report.consignee}, {bucket} {count.units}: "
+                    f"`{count.evidence}`"
+                )
+    log = state.get("receiving_log", {})
+    if log:
+        lines += ["", "## Firm's receiving log, cross-checked", ""]
+        for consignee, units in sorted(log.items()):
+            lines.append(f"- {consignee}: {units} units recorded arriving back")
+
+    lines += [
+        "",
+        f"{never} units were never recovered. The FDA enforcement record for "
+        f"{args.recall} has no field in which to say so.",
+    ]
+    print("\n".join(lines))
+    return 0
+
+
 def cmd_fetch(args: argparse.Namespace) -> int:
     """Pull a real recall record from openFDA, or read the bundled fixture.
 
@@ -287,6 +357,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--recall", required=True)
     p.add_argument("--authorized-by", dest="authorized_by", required=True)
     p.set_defaults(func=cmd_close)
+
+    p = sub.add_parser(
+        "certificate",
+        help="emit the closure certificate for a closed recall",
+    )
+    p.add_argument("--recall", required=True)
+    p.set_defaults(func=cmd_certificate)
 
     p = sub.add_parser("fetch", help="show the regulator's record for a recall")
     p.add_argument("--recall", required=True)
