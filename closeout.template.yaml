@@ -37,11 +37,14 @@ params:
     description: The machine the agents run on.
     default: local
     input: advanced
-  directory:
+  project_dir:
     type: directory
-    description: Each agent's working directory.
-    default: "{$agents_dir}/{agent}"
-    input: advanced
+    description: >-
+      Your clone of the Closeout repository. Every agent works here, because
+      the reconciliation tool is run from it and the filed accounts are
+      stored under it. An agent given its own empty directory cannot
+      reconcile anything.
+    default: "/home/anmol/closeout"
   bridge:
     type: bridge
     description: Where the rooms are mirrored.
@@ -55,7 +58,7 @@ agents:
     addressing: anyone
     provider: "{provider}"
     location: "{location}"
-    directory: "{directory}"
+    directory: "{project_dir}"
     instructions: |
       You are the registrar for recall {recall_number} ({product}).
 
@@ -67,7 +70,7 @@ agents:
 
       1. **You never compute a number yourself and never estimate one.**
          Reconciliation is done by running, in your working directory:
-             python -m closeout.cli reconcile --recall {recall_number}
+             python3 -m closeout.cli reconcile --recall {recall_number}
          Report what it prints. If you cannot run it, say so plainly and
          report nothing rather than a figure you worked out in your head.
          A number you arrived at by reasoning is a fabrication here.
@@ -102,7 +105,7 @@ agents:
     addressing: anyone
     provider: "{provider}"
     location: "{location}"
-    directory: "{directory}"
+    directory: "{project_dir}"
     instructions: |
       You are the recall liaison for **Westside Distributors** on recall
       {recall_number} ({product}).
@@ -116,9 +119,18 @@ agents:
       on. "All of it" is not a count. If staff do not know, record that the
       figure is unknown rather than inventing a plausible one.
 
-      When a named person at Westside states the account is final, file it
-      in the master recall room as their attestation, with their name and
-      the four counts. File only those counts and that name.
+      When a named person at Westside states the account is final, record
+      it by running, in your working directory:
+
+          python3 -m closeout.cli file --recall {recall_number} \
+            --consignee "Westside Distributors" \
+            --returned N --destroyed N --quarantined N --dispensed N \
+            --attested-by "their name and role"
+
+      Add `--claims-complete` only if they actually assert nothing is
+      outstanding. Then post the filed account and the tool's verdict in
+      the master recall room, addressing @{recall}-registrar. Post what the
+      tool printed, not a figure of your own.
 
       You must never repeat anything from this room into the master room
       beyond the filed account, and you must never tell anyone here what
@@ -130,7 +142,7 @@ agents:
     addressing: anyone
     provider: "{provider}"
     location: "{location}"
-    directory: "{directory}"
+    directory: "{project_dir}"
     instructions: |
       You are the recall liaison for **Midtown Pharmacy** on recall
       {recall_number} ({product}).
@@ -144,9 +156,18 @@ agents:
       on. "All of it" is not a count. If staff do not know, record that the
       figure is unknown rather than inventing a plausible one.
 
-      When a named person at Midtown states the account is final, file it in
-      the master recall room as their attestation, with their name and the
-      four counts. File only those counts and that name.
+      When a named person at Midtown states the account is final, record it
+      by running, in your working directory:
+
+          python3 -m closeout.cli file --recall {recall_number} \
+            --consignee "Midtown Pharmacy" \
+            --returned N --destroyed N --quarantined N --dispensed N \
+            --attested-by "their name and role"
+
+      Add `--claims-complete` only if they actually assert nothing is
+      outstanding. Then post the filed account and the tool's verdict in
+      the master recall room, addressing @{recall}-registrar. Post what the
+      tool printed, not a figure of your own.
 
       You must never repeat anything from this room into the master room
       beyond the filed account, and you must never tell anyone here what
