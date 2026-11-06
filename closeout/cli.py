@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+from dataclasses import replace
+
 from closeout.recon import BUCKETS, reconcile
 from closeout.store import RecallStore
 
@@ -128,7 +130,30 @@ def cmd_file(args: argparse.Namespace) -> int:
     print(f"Filed {args.consignee}'s account, attested by {args.attested_by}.")
     if uncited:
         print(f"  cites no document for: {', '.join(uncited)}")
-    return cmd_reconcile(args)
+
+    # Deliberately scoped to this consignee, and deliberately not a verdict.
+    #
+    # A liaison works inside one consignee's room, and the firm's receiving
+    # log is the other side of that consignee's transaction. Showing it here
+    # would hand the party being checked the number its paperwork has to
+    # agree with, which destroys the only check that does not rely on the
+    # consignee's own self-consistency. Filing records; the registrar, in a
+    # room no consignee can see, reconciles.
+    scoped = reconcile(
+        args.recall,
+        [
+            replace(report, independent_returns=None)
+            for report in store.reports()
+            if report.consignee == args.consignee
+        ],
+    )
+    print(f"  shipped {scoped.shipped}, accounted {scoped.accounted}, "
+          f"unaccounted {scoped.unaccounted}")
+    for finding in scoped.findings:
+        print(f"  - {finding.detail}")
+    print("\nFiled. The registrar reconciles this against every other "
+          "record; it does not settle here.")
+    return 0
 
 
 def cmd_receipt(args: argparse.Namespace) -> int:

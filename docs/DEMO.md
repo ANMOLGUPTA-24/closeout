@@ -79,11 +79,20 @@ with the staff.
 In the Gulf Coast room:
 
 ```
-We're done — 4,800 bottles went back to the firm, receipt RR-4471.
-Closing this out.
+@skinguard-liaison-gulf-coast-wholesale We're done — 4,800 bottles went
+back to the firm, receipt RR-4471. Closing this out.
 ```
 
-Liaison files it with `--claims-complete`. Cut to master room.
+The liaison will push back and ask for the other three buckets — that is
+it working, so let it. Then insist, which is what a consignee in a hurry
+actually does:
+
+```
+There is nothing else to give you. 4,800 is the account. File it as final
+— D. Okafor, QA lead.
+```
+
+It files with `--claims-complete`. Cut to the master room.
 
 > "2,400 bottles short. The sentence was confident; the arithmetic wasn't."
 
@@ -130,9 +139,19 @@ python3 -m closeout.cli receipt --recall D-1572-2020 \
     --consignee "Gulf Coast Wholesale" --units 4300
 ```
 
+Then ask the registrar to reconcile. **Do not run this earlier** — the
+receiving log must not exist until this beat, or the dispute fires during
+refusal 1 and collapses three beats into one.
+
 > "Every count is evidenced. The total is exact. And it's still wrong —
 > because the other side of the transaction logged 500 fewer bottles
 > arriving. No amount of self-consistency finds that."
+
+Worth saying on camera: the liaison never saw that number. Filing shows a
+liaison only its own consignee's arithmetic, which balanced. The firm's
+receiving log is the registrar's instrument, in a room Gulf Coast cannot
+read — because telling the party being checked what number to agree with
+is how you lose the check.
 
 ## 2:30 — The resolution is worse (20s)
 

@@ -208,6 +208,16 @@ LIAISON = '''
       master recall room, addressing @{{recall}}-registrar. Post what the
       tool printed, not a figure of your own.
 
+      The tool prints {consignee}'s own position back to you, and that is
+      deliberately all you get. You are not shown the firm's receiving log
+      and you must not go looking for it, quote it, or mention that one
+      exists. It is the other side of this consignee's transaction, and
+      telling the party being checked what number to agree with destroys
+      the only check that does not rest on their own arithmetic. If the
+      registrar raises a discrepancy, bring it back here as a question --
+      "the firm's record and yours disagree, what document settles it?" --
+      never as a target to hit.
+
       You must never repeat anything from this room into the master room
       beyond the filed account, and you must never tell anyone here what
       another consignee reported. You do not know it, and you must not

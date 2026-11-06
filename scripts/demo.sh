@@ -60,16 +60,17 @@ run reconcile --recall "$RECALL" || true
 rule "Riverside files a clean, evidenced account"
 run file --recall "$RECALL" --consignee "$EAST" \
   --returned 2400 --returned-evidence "returns-receipt/RR-5512" \
-  --attested-by "R. Iyer, pharmacist-in-charge" || true
+  --attested-by "R. Iyer, pharmacist-in-charge"
 
 rule "REFUSAL 1 — Gulf Coast asserts the recall is complete"
 cat <<'TXT'
 Gulf Coast returns 4,800 of 7,200 bottles and states the recall is
 finished. Nothing in the words is wrong. The arithmetic is.
 TXT
-refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+run file --recall "$RECALL" --consignee "$WEST" \
   --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
   --attested-by "D. Okafor, QA lead" --claims-complete
+refuse_or_die run reconcile --recall "$RECALL"
 echo
 echo ">> Refused. 2,400 bottles of methanol-labelled sanitizer are unaccounted for."
 
@@ -86,11 +87,12 @@ off-sale, 400 sold and unrecoverable. 7,200 of 7,200 accounted for.
 Only the returns cite a document. The destruction and the quarantine are
 Gulf Coast's word.
 TXT
-refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+run file --recall "$RECALL" --consignee "$WEST" \
   --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
   --destroyed 1500 --quarantined 500 \
   --dispensed 400 --dispensed-evidence "pos-export/2020-08-20" \
   --attested-by "D. Okafor, QA lead"
+refuse_or_die run reconcile --recall "$RECALL"
 echo
 echo ">> Refused. Adding up is not the same as being true."
 
@@ -103,12 +105,16 @@ Then the firm checks its own receiving log -- the other side of the
 transaction -- and finds it recorded 4,300 bottles arriving back, not 4,800.
 TXT
 run receipt --recall "$RECALL" --consignee "$WEST" --units 4300
-refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+run file --recall "$RECALL" --consignee "$WEST" \
   --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
   --destroyed 1500 --destroyed-evidence "destruction-cert/DC-118" \
   --quarantined 500 --quarantined-evidence "quarantine-log/Q-22" \
   --dispensed 400 --dispensed-evidence "pos-export/2020-08-20" \
   --attested-by "D. Okafor, QA lead"
+echo
+echo "The liaison files, and sees only Gulf Coast's own arithmetic -- which"
+echo "now balances. The dispute is the registrar's to find:"
+refuse_or_die run reconcile --recall "$RECALL"
 echo
 echo ">> Refused. Two records disagree by 500 bottles, and self-consistent"
 echo "   arithmetic could never have found it."

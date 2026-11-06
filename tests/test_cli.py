@@ -130,3 +130,54 @@ def test_fetch_rejects_a_recall_number_it_cannot_route():
 
     assert result.returncode == 2
     assert "D-, F- or Z-" in result.stderr
+
+
+# --- the liaison must not see the cross-check ----------------------------
+
+
+def test_filing_does_not_reveal_the_firms_receiving_log(seeded):
+    """A liaison works in the consignee's own room. Showing it the firm's
+    independent record would hand the party being checked the number its
+    paperwork has to agree with, which is the one check that does not rest
+    on the consignee's own self-consistency."""
+    seeded("receipt", "--recall", "D-1", "--consignee", "Gulf Coast", "--units", "600")
+    result = seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "1000", "--returned-evidence", "rr/1",
+        "--attested-by", "D. Okafor",
+    )
+
+    assert result.returncode == 0
+    combined = result.stdout + result.stderr
+    assert "600" not in combined
+    assert "receiving log" not in combined.lower()
+    assert "disputed" not in combined.lower()
+
+
+def test_the_registrar_does_see_the_dispute(seeded):
+    """Same data, the other room."""
+    seeded("receipt", "--recall", "D-1", "--consignee", "Gulf Coast", "--units", "600")
+    seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "1000", "--returned-evidence", "rr/1",
+        "--attested-by", "D. Okafor",
+    )
+    result = seeded("reconcile", "--recall", "D-1")
+
+    assert result.returncode == 1
+    assert "firm logged 600" in result.stdout
+    assert "400 units are claimed as returned" in result.stdout
+
+
+def test_filing_a_short_account_still_succeeds(seeded):
+    """Filing records what someone said; it does not pass judgement. The
+    verdict is the registrar's, so a short filing must not exit non-zero."""
+    result = seeded(
+        "file", "--recall", "D-1", "--consignee", "Gulf Coast",
+        "--returned", "400", "--returned-evidence", "rr/1",
+        "--attested-by", "D. Okafor",
+    )
+
+    assert result.returncode == 0
+    assert "unaccounted 600" in result.stdout
+    assert seeded("reconcile", "--recall", "D-1").returncode == 1
