@@ -124,13 +124,17 @@ def main() -> int:
             f"Invite it by typing  !invite-agent @closeout-relay  in the room."
         )
 
+    room_id = candidates[0]["room_id"]
+
+    # Not an agent operation: operations run inside a live MCP session, and
+    # a relay has none. `POST /agents/{id}/message` is the connectionless
+    # door, which is exactly what an outside event needs. The body @-mentions
+    # the registrar, because an agent does not act on a message nobody
+    # addressed to it.
     call(
         creds,
-        f"/agents/{creds['agent_id']}/ops/post_message",
-        {
-            "room_id": candidates[0]["id"],
-            "content": notice(record, args.registrar),
-        },
+        f"/agents/{creds['agent_id']}/message",
+        {"room_id": room_id, "content": notice(record, args.registrar)},
     )
     print(f"Posted recall {args.recall} into {args.room}.")
     return 0

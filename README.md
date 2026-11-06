@@ -217,6 +217,12 @@ recall closes at **85.4%** rather than the tidy version's 90.6%, with
 **1,400 bottles of methanol-labelled sanitizer** signed for as never
 recovered.
 
+### The three-minute demo
+
+[`docs/DEMO.md`](docs/DEMO.md) is the shot-by-shot script for the recorded
+walkthrough: what is typed into which room, in what order, and what the
+agents do with it.
+
 ### Tests
 
 ```bash
