@@ -107,19 +107,19 @@ agents:
       without scrolling.
 
 
-  # Member of Midtown Pharmacy's room and of the master room. Collecting counts
+  # Member of Gulf Coast Wholesale's room and of the master room. Collecting counts
   # happens in its own room; filing the account is the one crossing.
-  - name: "{recall}-liaison-midtown-pharmacy"
-    description: Collects and files Midtown Pharmacy's account
+  - name: "{recall}-liaison-gulf-coast-wholesale"
+    description: Collects and files Gulf Coast Wholesale's account
     addressing: anyone
     provider: "{provider}"
     location: "{location}"
     directory: "{project_dir}"
     instructions: |
-      You are the recall liaison for **Midtown Pharmacy** on recall
+      You are the recall liaison for **Gulf Coast Wholesale** on recall
       {recall_number} ({product}).
 
-      Midtown Pharmacy received **1000 units** of the recalled lot. Every one
+      Gulf Coast Wholesale received **7200 units** of the recalled lot. Every one
       of them has to end up in exactly one of four buckets: returned to the
       firm, destroyed on site, held in quarantine off-sale, or dispensed to
       customers and unrecoverable.
@@ -138,7 +138,7 @@ agents:
       in your working directory:
 
           python3 -m closeout.cli file --recall {recall_number} \
-            --consignee "Midtown Pharmacy" \
+            --consignee "Gulf Coast Wholesale" \
             --returned N --returned-evidence "returns-receipt/..." \
             --destroyed N --destroyed-evidence "destruction-cert/..." \
             --quarantined N --quarantined-evidence "quarantine-log/..." \
@@ -156,19 +156,19 @@ agents:
       speculate.
 
 
-  # Member of Westside Distributors's room and of the master room. Collecting counts
+  # Member of Riverside Pharmacy Group's room and of the master room. Collecting counts
   # happens in its own room; filing the account is the one crossing.
-  - name: "{recall}-liaison-westside-distributors"
-    description: Collects and files Westside Distributors's account
+  - name: "{recall}-liaison-riverside-pharmacy-group"
+    description: Collects and files Riverside Pharmacy Group's account
     addressing: anyone
     provider: "{provider}"
     location: "{location}"
     directory: "{project_dir}"
     instructions: |
-      You are the recall liaison for **Westside Distributors** on recall
+      You are the recall liaison for **Riverside Pharmacy Group** on recall
       {recall_number} ({product}).
 
-      Westside Distributors received **4278 units** of the recalled lot. Every one
+      Riverside Pharmacy Group received **2400 units** of the recalled lot. Every one
       of them has to end up in exactly one of four buckets: returned to the
       firm, destroyed on site, held in quarantine off-sale, or dispensed to
       customers and unrecoverable.
@@ -187,7 +187,7 @@ agents:
       in your working directory:
 
           python3 -m closeout.cli file --recall {recall_number} \
-            --consignee "Westside Distributors" \
+            --consignee "Riverside Pharmacy Group" \
             --returned N --returned-evidence "returns-receipt/..." \
             --destroyed N --destroyed-evidence "destruction-cert/..." \
             --quarantined N --quarantined-evidence "quarantine-log/..." \
@@ -217,8 +217,8 @@ rooms:
     bridge: "{bridge}"
     agents:
       - "{recall}-registrar"
-      - "{recall}-liaison-midtown-pharmacy"
-      - "{recall}-liaison-westside-distributors"
+      - "{recall}-liaison-gulf-coast-wholesale"
+      - "{recall}-liaison-riverside-pharmacy-group"
     users: ["{$creator}"]
     roles:
       - name: regulatory
@@ -244,10 +244,10 @@ rooms:
           This recall is closed by reconciliation and evidence, never by
           assertion.
 
-          5278 units went out, to 2 consignees:
+          9600 units went out, to 2 consignees:
 
-            - Midtown Pharmacy: 1000 units
-            - Westside Distributors: 4278 units
+            - Gulf Coast Wholesale: 7200 units
+            - Riverside Pharmacy Group: 2400 units
 
           Every unit must end in exactly one of four buckets: returned,
           destroyed, quarantined off-sale, or dispensed and therefore
@@ -279,29 +279,29 @@ rooms:
       Do not ask anyone to close anything yet.
 
 
-  - name: "recall-{recall}-midtown-pharmacy"
-    description: "Midtown Pharmacy's account for {recall_number}"
+  - name: "recall-{recall}-gulf-coast-wholesale"
+    description: "Gulf Coast Wholesale's account for {recall_number}"
     channel_type: channel_private
     bridge: "{bridge}"
-    agents: ["{recall}-liaison-midtown-pharmacy"]
+    agents: ["{recall}-liaison-gulf-coast-wholesale"]
     users: ["{$creator}"]
     kickoff: |
-      @{recall}-liaison-midtown-pharmacy: this is Midtown Pharmacy's room for recall
-      {recall_number}. They received 1000 units.
+      @{recall}-liaison-gulf-coast-wholesale: this is Gulf Coast Wholesale's room for recall
+      {recall_number}. They received 7200 units.
 
       Say in two lines what you need from the staff here, then ask for the
       first count and the document behind it. One bucket at a time.
 
 
-  - name: "recall-{recall}-westside-distributors"
-    description: "Westside Distributors's account for {recall_number}"
+  - name: "recall-{recall}-riverside-pharmacy-group"
+    description: "Riverside Pharmacy Group's account for {recall_number}"
     channel_type: channel_private
     bridge: "{bridge}"
-    agents: ["{recall}-liaison-westside-distributors"]
+    agents: ["{recall}-liaison-riverside-pharmacy-group"]
     users: ["{$creator}"]
     kickoff: |
-      @{recall}-liaison-westside-distributors: this is Westside Distributors's room for recall
-      {recall_number}. They received 4278 units.
+      @{recall}-liaison-riverside-pharmacy-group: this is Riverside Pharmacy Group's room for recall
+      {recall_number}. They received 2400 units.
 
       Say in two lines what you need from the staff here, then ask for the
       first count and the document behind it. One bucket at a time.
@@ -311,9 +311,9 @@ rooms:
 # master room deliberately does not point back, because a link would
 # disclose the consignee list to every consignee that can see it.
 links:
-  - from: "recall-{recall}-midtown-pharmacy"
+  - from: "recall-{recall}-gulf-coast-wholesale"
     to: "recall-{recall}"
     label: file the account here
-  - from: "recall-{recall}-westside-distributors"
+  - from: "recall-{recall}-riverside-pharmacy-group"
     to: "recall-{recall}"
     label: file the account here

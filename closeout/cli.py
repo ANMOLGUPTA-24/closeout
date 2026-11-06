@@ -187,8 +187,20 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     else:
         import urllib.request
 
+        # openFDA splits enforcement reports by product type, and the recall
+        # number says which: D- for drugs, F- for food, Z- for devices.
+        endpoint = {"D": "drug", "F": "food", "Z": "device"}.get(
+            args.recall[:1].upper()
+        )
+        if endpoint is None:
+            print(
+                f"error: cannot tell which openFDA endpoint serves "
+                f"{args.recall!r}; expected it to start with D-, F- or Z-.",
+                file=sys.stderr,
+            )
+            return 2
         url = (
-            "https://api.fda.gov/food/enforcement.json?search=recall_number:"
+            f"https://api.fda.gov/{endpoint}/enforcement.json?search=recall_number:"
             f'"{args.recall}"&limit=1'
         )
         try:

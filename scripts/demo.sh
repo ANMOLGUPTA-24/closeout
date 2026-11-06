@@ -15,7 +15,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PY="${PY:-python3}"
-RECALL="F-0616-2018"
+RECALL="D-1572-2020"
+WEST="Gulf Coast Wholesale"
+EAST="Riverside Pharmacy Group"
 STATE="$(mktemp -d)"
 trap 'rm -rf "$STATE"' EXIT
 
@@ -30,37 +32,44 @@ refuse_or_die() {
 
 rule "The regulator's record"
 cat <<'TXT'
-F-0616-2018 is a real FDA Class I recall: Nyblad Orchards apples, possible
-Listeria. The record says "5278 units shipped", lists eleven lot numbers,
-and gives its status as Terminated.
+D-1572-2020 is a real FDA Class I drug recall: SkinGuard 24 hand sanitizer,
+"all lots labeled to contain methanol", 9,600 bottles, distributed
+nationwide. Its status is Terminated.
 
-What it does not say -- what the enforcement schema has no field for at
-all -- is how many of those 5,278 units ever came back.
+Methanol is absorbed through skin and is lethal swallowed. Over two months
+in 2020, CDC reviewed 15 hospitalisations from methanol-contaminated hand
+sanitizer in two states: four people died and three were left permanently
+blind. (MMWR 69(32):1070-1073. Those cases are not attributed to this
+recall; they are why this entire product category is Class I.)
+
+So: how many of the 9,600 bottles came back?
+
+The record does not say. The enforcement schema has no field for it.
 TXT
 run fetch --recall "$RECALL" --offline
 
-rule "Shipments on record (synthetic split of the real 5,278 units)"
-run ship --recall "$RECALL" --consignee "Westside Distributors" --units 4278
-run ship --recall "$RECALL" --consignee "Midtown Pharmacy" --units 1000
+rule "Shipments on record (synthetic split of the real 9,600 bottles)"
+run ship --recall "$RECALL" --consignee "$WEST" --units 7200
+run ship --recall "$RECALL" --consignee "$EAST" --units 2400
 
 rule "Opening position: nobody has filed"
 run reconcile --recall "$RECALL" || true
 
-rule "Midtown files a clean, evidenced account"
-run file --recall "$RECALL" --consignee "Midtown Pharmacy" \
-  --returned 1000 --returned-evidence "returns-receipt/RR-5512" \
+rule "Riverside files a clean, evidenced account"
+run file --recall "$RECALL" --consignee "$EAST" \
+  --returned 2400 --returned-evidence "returns-receipt/RR-5512" \
   --attested-by "R. Iyer, pharmacist-in-charge" || true
 
-rule "REFUSAL 1 — Westside asserts the recall is complete"
+rule "REFUSAL 1 — Gulf Coast asserts the recall is complete"
 cat <<'TXT'
-Westside returns 2,878 of 4,278 units and states the recall is finished.
-Nothing in the words is wrong. The arithmetic is.
+Gulf Coast returns 4,800 of 7,200 bottles and states the recall is
+finished. Nothing in the words is wrong. The arithmetic is.
 TXT
-refuse_or_die run file --recall "$RECALL" --consignee "Westside Distributors" \
-  --returned 2878 --returned-evidence "returns-receipt/RR-4471" \
+refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+  --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
   --attested-by "D. Okafor, QA lead" --claims-complete
 echo
-echo ">> Refused. 1,400 Class I units are unaccounted for."
+echo ">> Refused. 2,400 bottles of methanol-labelled sanitizer are unaccounted for."
 
 rule "REFUSAL 1b — regulatory sign-off is attempted anyway"
 refuse_or_die run close --recall "$RECALL" --authorized-by "@regulatory"
@@ -69,52 +78,52 @@ echo ">> Even the regulatory role cannot close it. Authority is not arithmetic."
 
 rule "REFUSAL 2 — the account now balances, but rests on nothing"
 cat <<'TXT'
-Westside finds the rest: 900 destroyed on site, 300 quarantined off-sale,
-200 sold and unrecoverable. 4,278 of 4,278 accounted for.
+Gulf Coast finds the rest: 1,500 destroyed on site, 500 quarantined
+off-sale, 400 sold and unrecoverable. 7,200 of 7,200 accounted for.
 
 Only the returns cite a document. The destruction and the quarantine are
-Westside's word.
+Gulf Coast's word.
 TXT
-refuse_or_die run file --recall "$RECALL" --consignee "Westside Distributors" \
-  --returned 2878 --returned-evidence "returns-receipt/RR-4471" \
-  --destroyed 900 --quarantined 300 \
-  --dispensed 200 --dispensed-evidence "pos-export/2018-03-14" \
+refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+  --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
+  --destroyed 1500 --quarantined 500 \
+  --dispensed 400 --dispensed-evidence "pos-export/2020-08-20" \
   --attested-by "D. Okafor, QA lead"
 echo
 echo ">> Refused. Adding up is not the same as being true."
 
 rule "REFUSAL 3 — every count is evidenced, and one is still wrong"
 cat <<'TXT'
-Westside produces the destruction certificate and the quarantine log. Every
-count now cites a document, and the total is exact.
+Gulf Coast produces the destruction certificate and the quarantine log.
+Every count now cites a document, and the total is exact.
 
 Then the firm checks its own receiving log -- the other side of the
-transaction -- and finds it recorded 2,600 units arriving back, not 2,878.
+transaction -- and finds it recorded 4,300 bottles arriving back, not 4,800.
 TXT
-run receipt --recall "$RECALL" --consignee "Westside Distributors" --units 2600
-refuse_or_die run file --recall "$RECALL" --consignee "Westside Distributors" \
-  --returned 2878 --returned-evidence "returns-receipt/RR-4471" \
-  --destroyed 900 --destroyed-evidence "destruction-cert/DC-118" \
-  --quarantined 300 --quarantined-evidence "quarantine-log/Q-22" \
-  --dispensed 200 --dispensed-evidence "pos-export/2018-03-14" \
+run receipt --recall "$RECALL" --consignee "$WEST" --units 4300
+refuse_or_die run file --recall "$RECALL" --consignee "$WEST" \
+  --returned 4800 --returned-evidence "returns-receipt/RR-4471" \
+  --destroyed 1500 --destroyed-evidence "destruction-cert/DC-118" \
+  --quarantined 500 --quarantined-evidence "quarantine-log/Q-22" \
+  --dispensed 400 --dispensed-evidence "pos-export/2020-08-20" \
   --attested-by "D. Okafor, QA lead"
 echo
-echo ">> Refused. Two records disagree by 278 units, and self-consistent"
+echo ">> Refused. Two records disagree by 500 bottles, and self-consistent"
 echo "   arithmetic could never have found it."
 
 rule "RUN A — the dispute is resolved, and the truth is worse"
 cat <<'TXT'
-The 278 units were never sent back. They were sold before the recall notice
-reached the shop floor, and written up as returns afterwards.
+The 500 bottles were never sent back. They were sold before the recall
+notice reached the shop floor, and written up as returns afterwards.
 
 They do not move from "returned" to "found". They move from "recovered" to
-"in someone's kitchen".
+"in somebody's bathroom".
 TXT
-run file --recall "$RECALL" --consignee "Westside Distributors" \
-  --returned 2600 --returned-evidence "returns-receipt/RR-4471" \
-  --destroyed 900 --destroyed-evidence "destruction-cert/DC-118" \
-  --quarantined 300 --quarantined-evidence "quarantine-log/Q-22" \
-  --dispensed 478 --dispensed-evidence "pos-export/2018-03-14" \
+run file --recall "$RECALL" --consignee "$WEST" \
+  --returned 4300 --returned-evidence "returns-receipt/RR-4471" \
+  --destroyed 1500 --destroyed-evidence "destruction-cert/DC-118" \
+  --quarantined 500 --quarantined-evidence "quarantine-log/Q-22" \
+  --dispensed 900 --dispensed-evidence "pos-export/2020-08-20" \
   --attested-by "D. Okafor, QA lead"
 
 rule "RUN A — closure authorized, with the recovery rate stated"
@@ -122,14 +131,14 @@ run close --recall "$RECALL" --authorized-by "M. Haddad, regulatory affairs"
 
 rule "What was signed for"
 cat <<'TXT'
-4,500 of 5,278 units recovered: 85.3%. Every one of them backed by a
+8,200 of 9,600 bottles recovered: 85.4%. Every one of them backed by a
 document.
 
-778 units were never recovered -- 300 still held off-sale, and 478 eaten or
-in a fridge somewhere. The cross-check moved 278 of those out of the
-recovered column, where self-consistent arithmetic had been happy to leave
-them.
+1,400 bottles were never recovered -- 500 still held off-sale, and 900 sold
+to people who have them at home. The cross-check moved 500 of those out of
+the recovered column, where self-consistent arithmetic had been happy to
+leave them.
 
-That is the number a recall should be closed on, and the FDA enforcement
-record has nowhere to put it.
+That is the number a recall should be closed on. The FDA enforcement
+record has nowhere to put it, and this recall's status is Terminated.
 TXT
