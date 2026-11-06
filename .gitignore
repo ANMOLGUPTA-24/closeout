@@ -1,0 +1,6 @@
+.venv/
+vendor-dl/
+data/recalls/
+__pycache__/
+*.pyc
+.pytest_cache/
