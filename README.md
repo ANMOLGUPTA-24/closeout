@@ -1,6 +1,11 @@
 # Closeout
 
+[![CI](https://github.com/ANMOLGUPTA-24/closeout/actions/workflows/ci.yml/badge.svg)](https://github.com/ANMOLGUPTA-24/closeout/actions/workflows/ci.yml)
+
 **A product recall is closed by reconciliation, never by assertion.**
+
+Python 3.10+, standard library only. `./scripts/demo.sh` is the whole
+argument in thirty seconds.
 
 Closeout is a Switch room where an agent holds a recall open until every
 unit is accounted for and every count rests on a document, and refuses to
