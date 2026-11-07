@@ -25,6 +25,7 @@ def cli(tmp_path):
             text=True,
         )
 
+    run.root = tmp_path
     return run
 
 
@@ -218,3 +219,59 @@ def test_non_numeric_units_rejected(cli):
     bad = cli("ship", "--recall", "N-3", "--consignee", "A", "--units", "abc")
     assert bad.returncode == 2
     assert "not a whole number of units" in bad.stderr
+
+
+@pytest.fixture
+def closed(cli):
+    """A recall that reconciles and has been signed off."""
+    cli("ship", "--recall", "S-1", "--consignee", "A", "--units", "1000")
+    cli("file", "--recall", "S-1", "--consignee", "A",
+        "--returned", "1000", "--returned-evidence", "returns-receipt/RR-1",
+        "--attested-by", "D. Okafor", "--claims-complete")
+    done = cli("close", "--recall", "S-1", "--authorized-by", "M. Haddad")
+    assert done.returncode == 0
+    return cli
+
+
+def test_a_closure_is_not_overwritten(closed):
+    """Closing twice would move the signature and keep the first timestamp."""
+    again = closed("close", "--recall", "S-1", "--authorized-by", "the janitor")
+    assert again.returncode == 2
+    assert "already closed by M. Haddad" in again.stderr
+    assert "the janitor" not in closed("certificate", "--recall", "S-1").stdout
+
+
+def test_a_closed_recall_takes_no_further_records(closed):
+    for args in (
+        ("file", "--recall", "S-1", "--consignee", "A", "--returned", "1",
+         "--returned-evidence", "x", "--attested-by", "y"),
+        ("ship", "--recall", "S-1", "--consignee", "B", "--units", "50"),
+        ("receipt", "--recall", "S-1", "--consignee", "A", "--units", "10"),
+    ):
+        refused = closed(*args)
+        assert refused.returncode == 2, args[0]
+        assert "takes no further records" in refused.stderr, args[0]
+
+
+def test_the_certificate_states_the_figures_that_were_signed_for(closed):
+    """The artifact must not drift from the signature it carries.
+
+    A certificate recomputed from current state would show today's figures
+    under a signature given for the figures of the day -- the assertion
+    this project exists to refuse.
+    """
+    before = closed("certificate", "--recall", "S-1").stdout
+    assert "Recovered: **1000** (100.0%)" in before
+
+    # Even if the state file is reached around the CLI, the certificate is
+    # rendered from the snapshot taken at closure, not recomputed.
+    import json
+    from pathlib import Path
+    state_file = next(Path(closed.root).glob("S-1.json"))
+    state = json.loads(state_file.read_text())
+    state["accounts"]["A"]["counts"]["returned"] = 1
+    state_file.write_text(json.dumps(state))
+
+    after = closed("certificate", "--recall", "S-1").stdout
+    assert after == before
+    assert "Recovered: **1000** (100.0%)" in after

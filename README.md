@@ -100,6 +100,13 @@ Every unit shipped to a consignee must end in exactly one of four buckets —
 therefore unrecoverable. The residue is unaccounted product: it is
 somewhere in the market and nobody can point to it.
 
+Only **returned** and **destroyed** count as recovered. Quarantined stock
+is accounted for and off-sale, but it is still sitting on the consignee's
+shelf: the recall is not finished for those units, it is paused, and a
+recovery rate that counted them would be flattering. That is why the demo
+closes at 85.4% rather than 90.6% — 500 of the 1,400 unrecovered bottles
+are quarantined, not lost.
+
 Three different things can be wrong with an account, and they are not the
 same thing:
 
@@ -162,7 +169,7 @@ flowchart TB
 | **One-way links** | Consignee rooms link **to** the master room; the master never links back. | A room's name is visible to everyone in a room that links to it. Linking outward would disclose the whole consignee list to every consignee. |
 | **Role verification** | Before accepting a closure instruction, the registrar reads the room's roles and checks the instructing person holds the exclusive `regulatory` role. | A name typed into a chat message is not an authorisation; the role is, and Switch is what knows who holds it. **This one is an instruction, not an enforcement** — the agent is told to check. The membership boundary above is the part Switch enforces whatever the agent does. |
 | **Room documents** | The closure rule and the distribution list ship as a room doc; on closure the registrar writes a **closure certificate** as a document. | Every agent that joins is briefed. And a chat message scrolls away — somebody will come looking for how a recall was closed in two years. |
-| **Agent as event relay** | `closeout-relay` posts the FDA notice via `POST /agents/{id}/message`. | Switch has no scheduler and no inbound webhook ([issue #799](https://github.com/sandbox-quantum/switch/issues/799)), so an outside event reaches a room only through a registered agent. |
+| **Agent as event relay** | `closeout-relay` posts the FDA notice via `POST /agents/{id}/message`. | Switch has no scheduler, and inbound webhooks are still an open request ([issue #799](https://github.com/sandbox-quantum/switch/issues/799), with a PR against it), so an outside event reaches a room only through a registered agent. |
 | **Templates, generated** | `scripts/generate_template.py` builds the whole group — one room and one liaison per consignee, plus roles, docs and links — from the distribution list. | A Class I recall fans out to hundreds of consignees. Hand-written YAML caps the recall at however many rooms somebody felt like typing; the generator is tested at twelve. |
 
 **Take Switch away and this is not a worse version of the same thing.** It
@@ -265,7 +272,7 @@ python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
 .venv/bin/python -m pytest tests/ -q
 ```
 
-59 tests, weighted toward the refusal paths: false completion, overage,
+62 tests, weighted toward the refusal paths: false completion, overage,
 unevidenced counts, disputed returns in both directions, duplicate
 accounts, silence-is-not-completion, a state file written before a field
 existed, a recall number that tries to escape the state directory, and a
@@ -347,6 +354,23 @@ Credentials are written at mode 0600 and are never printed.
   Console. `scripts/console_provision.py` does the teardown either side of
   a run, which is otherwise a dozen clicks and leaves orphaned Mattermost
   channels behind.
+- **The cross-check covers one bucket of four.** The firm's receiving log
+  is compared against what a consignee claims it **returned**. There is no
+  independent source for destroyed, quarantined or dispensed, so the same
+  500 phantom bottles survive the third refusal if they are relabelled as
+  destroyed with a certificate number. The cross-check is the strongest of
+  the three tests and it is still only as wide as the evidence that exists
+  on both sides of the transaction.
+- **"Cites a document" means a non-empty string.** There is no document
+  store and nothing fetches `destruction-cert/DC-118` to confirm it exists
+  or says what the count claims. Refusal 2 establishes that somebody was
+  willing to name a document, which is a real step up from a bare number
+  and well short of proof.
+- **A closed recall cannot be reopened.** Closure snapshots the figures and
+  seals the record: no further accounts, shipments or receipts are accepted,
+  and the certificate is rendered from the snapshot rather than recomputed,
+  so it cannot drift away from the signature it carries. Real recalls do get
+  reopened; that is a deliberate act and it is not modelled here.
 - **Lot-to-consignee quantities are synthetic.** The recall record is real,
   and so is its 9,600-bottle total, but openFDA does not publish who
   received which lot. The split across two consignees is invented, and

@@ -105,8 +105,31 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     return 1
 
 
+def refuse_if_closed(store: RecallStore, recall: str) -> int | None:
+    """A closed recall accepts no further records.
+
+    Closure is signed for. If an account, a shipment or a receiving-log
+    entry could still land afterwards, the figures under that signature
+    would keep moving and the certificate would stop being evidence of
+    anything. Reopening a recall is a deliberate act and is not modelled
+    here; the refusal says so rather than silently accepting the write.
+    """
+    closure = store.closure()
+    if not closure:
+        return None
+    print(
+        f"error: recall {recall} was closed by {closure['authorized_by']} at "
+        f"{closure['closed_at']}; a closed recall takes no further records.",
+        file=sys.stderr,
+    )
+    return 2
+
+
 def cmd_file(args: argparse.Namespace) -> int:
     store = RecallStore(args.recall, root=args.root)
+    sealed = refuse_if_closed(store, args.recall)
+    if sealed is not None:
+        return sealed
     known = set(store.load()["shipments"])
     if args.consignee not in known:
         print(
@@ -159,6 +182,9 @@ def cmd_file(args: argparse.Namespace) -> int:
 def cmd_receipt(args: argparse.Namespace) -> int:
     """Record the firm's own receiving log for one consignee."""
     store = RecallStore(args.recall, root=args.root)
+    sealed = refuse_if_closed(store, args.recall)
+    if sealed is not None:
+        return sealed
     store.record_receipt(args.consignee, args.units)
     print(
         f"Firm's receiving log: {args.units} units recorded back from "
@@ -169,14 +195,56 @@ def cmd_receipt(args: argparse.Namespace) -> int:
 
 def cmd_ship(args: argparse.Namespace) -> int:
     store = RecallStore(args.recall, root=args.root)
+    sealed = refuse_if_closed(store, args.recall)
+    if sealed is not None:
+        return sealed
     store.set_shipment(args.consignee, args.units)
     print(f"Recorded {args.units} units shipped to {args.consignee}.")
     return 0
 
 
+def closure_snapshot(result, store: RecallStore) -> dict:
+    """Everything the certificate needs, frozen at the moment of signature."""
+    return {
+        "shipped": result.shipped,
+        "recovered": result.recovered,
+        "recovery_rate": result.recovery_rate,
+        "receiving_log": dict(store.load().get("receiving_log", {})),
+        "reports": [
+            {
+                "consignee": report.consignee,
+                "shipped": report.shipped,
+                "counts": {
+                    bucket: getattr(report.disposition, bucket).units
+                    for bucket in BUCKETS
+                },
+                "evidence": {
+                    bucket: getattr(report.disposition, bucket).evidence
+                    for bucket in BUCKETS
+                },
+                "attested_by": report.attested_by,
+            }
+            for report in result.reports
+        ],
+    }
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """Authorize closure. Refuses unless reconciliation permits it."""
     store = RecallStore(args.recall, root=args.root)
+
+    # Closing twice would overwrite who signed, and the second signature
+    # would inherit the first one's timestamp. Whoever closed it, closed it.
+    existing = store.closure()
+    if existing:
+        print(
+            f"error: recall {args.recall} was already closed by "
+            f"{existing['authorized_by']} at {existing['closed_at']}. "
+            "A closure is not overwritten.",
+            file=sys.stderr,
+        )
+        return 2
+
     result = reconcile(args.recall, store.reports())
 
     if not result.may_close:
@@ -185,7 +253,7 @@ def cmd_close(args: argparse.Namespace) -> int:
             print(f"  - {blocker}", file=sys.stderr)
         return 1
 
-    store.record_closure(args.authorized_by, result.recovery_rate)
+    store.record_closure(args.authorized_by, closure_snapshot(result, store))
     print(
         f"Recall {args.recall} closed by {args.authorized_by}. "
         f"Recovery rate {_fmt_rate(result.recovery_rate)}; "
@@ -200,6 +268,12 @@ def cmd_certificate(args: argparse.Namespace) -> int:
     The registrar posts this into the room as a document rather than a
     message, because a chat message scrolls away and a recall's closure is
     the one thing someone will come looking for in two years.
+
+    It is rendered from the snapshot taken when the recall was signed off,
+    never recomputed from current state. A certificate that recomputed
+    would show whatever the figures say today under a signature given for
+    the figures of the day -- which is precisely the assertion this project
+    exists to refuse.
     """
     store = RecallStore(args.recall, root=args.root)
     state = store.load()
@@ -212,15 +286,26 @@ def cmd_certificate(args: argparse.Namespace) -> int:
         )
         return 1
 
-    result = reconcile(args.recall, store.reports())
-    never = result.shipped - result.recovered
+    snapshot = closure.get("snapshot")
+    if not snapshot:
+        print(
+            f"error: recall {args.recall} was closed before closure "
+            "snapshots were recorded, so no certificate can be issued for "
+            "it without recomputing figures nobody signed for.",
+            file=sys.stderr,
+        )
+        return 2
+
+    shipped = snapshot["shipped"]
+    recovered = snapshot["recovered"]
+    never = shipped - recovered
     lines = [
-        f"# Closure certificate — recall {args.recall}",
+        f"# Closure certificate \u2014 recall {args.recall}",
         "",
         f"Closed by **{closure['authorized_by']}** at {closure['closed_at']}.",
         "",
-        f"- Shipped: **{result.shipped}**",
-        f"- Recovered: **{result.recovered}** ({_fmt_rate(result.recovery_rate)})",
+        f"- Shipped: **{shipped}**",
+        f"- Recovered: **{recovered}** ({_fmt_rate(snapshot['recovery_rate'])})",
         f"- Never recovered: **{never}**",
         "",
         "## What each consignee accounted for",
@@ -228,28 +313,26 @@ def cmd_certificate(args: argparse.Namespace) -> int:
         "| Consignee | Shipped | Returned | Destroyed | Quarantined | Dispensed | Attested by |",
         "|---|---|---|---|---|---|---|",
     ]
-    for report in result.reports:
-        counts = " | ".join(
-            str(getattr(report.disposition, bucket).units) for bucket in BUCKETS
-        )
+    for report in snapshot["reports"]:
+        counts = " | ".join(str(report["counts"][bucket]) for bucket in BUCKETS)
         lines.append(
-            f"| {report.consignee} | {report.shipped} | {counts} | "
-            f"{report.attested_by} |"
+            f"| {report['consignee']} | {report['shipped']} | {counts} | "
+            f"{report['attested_by']} |"
         )
     lines += [
         "",
         "## Evidence",
         "",
     ]
-    for report in result.reports:
+    for report in snapshot["reports"]:
         for bucket in BUCKETS:
-            count = getattr(report.disposition, bucket)
-            if count.units:
+            units = report["counts"][bucket]
+            if units:
                 lines.append(
-                    f"- {report.consignee}, {bucket} {count.units}: "
-                    f"`{count.evidence}`"
+                    f"- {report['consignee']}, {bucket} {units}: "
+                    f"`{report['evidence'][bucket]}`"
                 )
-    log = state.get("receiving_log", {})
+    log = snapshot.get("receiving_log", {})
     if log:
         lines += ["", "## Firm's receiving log, cross-checked", ""]
         for consignee, units in sorted(log.items()):

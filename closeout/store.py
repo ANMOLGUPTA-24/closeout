@@ -112,14 +112,28 @@ class RecallStore:
         state["receiving_log"][consignee] = int(units)
         self.save(state)
 
-    def record_closure(self, authorized_by: str, recovery_rate: float) -> None:
+    def record_closure(self, authorized_by: str, snapshot: dict[str, Any]) -> None:
+        """Seal the recall, with the figures as they stood at that moment.
+
+        The certificate is rendered from this snapshot and never recomputed.
+        A recomputed certificate is not a record of what was signed: it is a
+        record of what the state file happens to say now, which would let a
+        later filing move the number above somebody else's signature. The
+        whole claim of this project is that the closure artifact can be
+        trusted in two years, so it is frozen here.
+        """
         state = self.load()
         state["closure"] = {
             "authorized_by": authorized_by,
-            "recovery_rate": round(recovery_rate, 4),
+            "recovery_rate": round(float(snapshot["recovery_rate"]), 4),
             "closed_at": _now(),
+            "snapshot": snapshot,
         }
         self.save(state)
+
+    def closure(self) -> dict[str, Any] | None:
+        """The closure record, or None while the recall is still open."""
+        return self.load().get("closure")
 
     # --- reading ----------------------------------------------------------
 
