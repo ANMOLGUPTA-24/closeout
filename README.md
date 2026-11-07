@@ -176,6 +176,34 @@ flowchart TB
 is a single channel in which every consignee reads every other consignee's
 figures, which in a real recall is unlawful.
 
+## What it looks like in a room
+
+![The liaison interrogating Gulf Coast](docs/screenshots/liaison-interrogates.png)
+
+A real room on a real Switch server. Gulf Coast says "we're done — 4,800
+bottles went back". The liaison does not file it. It asks for the other three
+buckets, the document behind each count, and the name of whoever is attesting,
+and it says plainly that "don't know" is an acceptable answer but an invented
+figure is not.
+
+**This screenshot is also a bug report.** Look at the last line: the liaison
+tells Gulf Coast that the firm's receiving log shows 4,300. It should never
+have known that. The receiving log is the other side of Gulf Coast's own
+transaction, and handing it to the party being checked tells them exactly which
+number their paperwork has to agree with — destroying the one check that does
+not rest on their own arithmetic.
+
+I found that by dry-running the rooms rather than by reading the code. Filing
+and judging are now separate: `file` records an account and shows that consignee
+its own arithmetic only, and `reconcile` is the registrar's verdict, in a room
+no consignee can read. Three tests cover it, including one asserting the firm's
+figure never appears in a liaison's output.
+
+![The activity card on a liaison's turn](docs/screenshots/activity-card.png)
+
+"Worked for 12s. 1 tool call." The agent is running the reconciliation tool,
+not describing it.
+
 ## The agent never does the arithmetic
 
 `closeout/recon.py` is plain Python with no model in it. The registrar's
