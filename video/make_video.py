@@ -52,6 +52,22 @@ def panel_lines(d, top, lines, pad=30):
         d.text((170, y), t, font=MONO, fill=c); y += 48
     return top + 2*pad + 48*len(lines)
 
+
+def shot(path, title, caption, colour=ACCENT):
+    """A real screenshot, letterboxed, with a caption under it."""
+    img, d = new()
+    d.text((120, 70), title, font=H2, fill=colour)
+    pic = Image.open(path)
+    avail_w, avail_h = W - 240, 740
+    scale = min(avail_w / pic.width, avail_h / pic.height)
+    pic = pic.resize((int(pic.width * scale), int(pic.height * scale)), Image.LANCZOS)
+    x = (W - pic.width) // 2
+    d.rounded_rectangle([x - 8, 152, x + pic.width + 8, 160 + pic.height + 8], 12,
+                        fill=PANEL, outline=(55, 62, 72), width=2)
+    img.paste(pic, (x, 160))
+    wrap(d, caption, (120, 170 + pic.height + 30), BODY, DIM, 84)
+    return img
+
 # --------------------------------------------------------------- the scenes
 scenes: list[tuple[Image.Image, str]] = []
 def scene(img, narration): scenes.append((img, narration))
@@ -138,6 +154,37 @@ d.text((120, 750), "that is unlawful.", font=H2, fill=RED)
 scene(img, "That idea is not mine. It is Switch's own documentation. Take Switch away "
            "and you have one channel where every company reads every other's "
            "figures. In a real recall, that is unlawful.")
+
+# 6b ------------------------------------------------------ the room, for real
+scene(shot("docs/screenshots/liaison-interrogates.png",
+           "A real room, mid dry-run",
+           "Gulf Coast says the recall is finished. The liaison does not file "
+           "it: it asks for the other three buckets, the document behind each "
+           "count, and the name of whoever is attesting."),
+      "Here is one of those rooms. Gulf Coast says we are done, four thousand "
+      "eight hundred bottles went back. The liaison does not just file it. It "
+      "asks for the other three buckets, the document behind each count, and "
+      "the name of whoever is attesting.")
+
+# 6c ------------------------------------------------------ the screenshot bug
+img, d = new()
+d.text((120, 110), "That screenshot is also a bug report", font=H1, fill=RED)
+wrap(d, "Read its last line again:", (120, 240), BODY, DIM, 80)
+panel_lines(d, 310, [
+    ("One flag: the firm's receiving log shows 4,300 back, not 4,800.", AMBER)])
+wrap(d, "The liaison should never have known that. The receiving log is the "
+        "other side of Gulf Coast's own transaction, and handing it to the "
+        "party being checked tells them exactly which number their paperwork "
+        "has to agree with.",
+     (120, 480), BODY, FG, 84)
+d.text((120, 760), "Filing and judging are separate now.", font=H2, fill=GREEN)
+wrap(d, "A liaison sees only its own consignee's arithmetic. The verdict "
+        "belongs to the registrar, in a room no consignee can read. Three "
+        "tests cover it.", (120, 840), BODY, DIM, 84)
+scene(img, "And that screenshot is also a bug report. Read the last line: the "
+           "liaison tells Gulf Coast what the firm's receiving log says. It "
+           "should never have known that. I found it by dry-running the rooms, "
+           "not by reading the code. Filing and judging are separate now.")
 
 # 7 ------------------------------------------------------------- the trigger
 img, d = new()
