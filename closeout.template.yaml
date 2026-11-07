@@ -36,7 +36,7 @@ params:
       the reconciliation tool is run from it and the filed accounts are
       stored under it. An agent given its own empty directory cannot
       reconcile anything.
-    default: "/home/anmol/closeout"
+    default: "/path/to/your/clone/of/closeout"
   provider:
     type: provider
     description: Which coding agent backs the agents. The first one installed is chosen.
