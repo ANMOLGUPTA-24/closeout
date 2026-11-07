@@ -25,9 +25,11 @@ CREDS = Path.home() / ".config" / "closeout" / "relay.json"
 TEMPLATE = Path(__file__).resolve().parent.parent / "closeout.template.yaml"
 
 TEMPLATE_NAME = "closeout-recall-room"
-RECALL_SLUG = "nyblad"
-RECALL_NUMBER = "F-0616-2018"
-PRODUCT = "Nyblad Orchards whole fresh apples, possible Listeria (Class I)"
+# Defaults match the demo the README and docs/DEMO.md walk through. Override
+# them on the command line to provision a different recall.
+RECALL_SLUG = "skinguard"
+RECALL_NUMBER = "D-1572-2020"
+PRODUCT = "SkinGuard 24 hand sanitizer, labelled to contain methanol (Class I)"
 
 
 def load_creds() -> dict:
@@ -63,6 +65,12 @@ def op(creds: dict, name: str, payload: dict) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--save-only", action="store_true")
+    parser.add_argument("--recall-slug", default=RECALL_SLUG,
+                        help=f"short slug used in every name it creates (default: {RECALL_SLUG})")
+    parser.add_argument("--recall", default=RECALL_NUMBER,
+                        help=f"the regulator's recall number (default: {RECALL_NUMBER})")
+    parser.add_argument("--product", default=PRODUCT,
+                        help="one line naming the recalled product and the hazard")
     args = parser.parse_args()
 
     creds = load_creds()
@@ -107,9 +115,9 @@ def main() -> int:
         {
             "template_id": template_id,
             "inputs": {
-                "recall": RECALL_SLUG,
-                "recall_number": RECALL_NUMBER,
-                "product": PRODUCT,
+                "recall": args.recall_slug,
+                "recall_number": args.recall,
+                "product": args.product,
             },
         },
     )

@@ -181,3 +181,40 @@ def test_filing_a_short_account_still_succeeds(seeded):
     assert result.returncode == 0
     assert "unaccounted 600" in result.stdout
     assert seeded("reconcile", "--recall", "D-1").returncode == 1
+
+
+def test_negative_units_rejected_before_anything_is_written(cli):
+    """A negative count must not reach the state file.
+
+    The dataclasses reject negatives, but only when a record is read back.
+    If the CLI persists one first, every later reconcile, close and
+    certificate raises and the recall is unusable until someone refiles by
+    hand -- a fat-finger mid-demo would brick it.
+    """
+    assert cli("ship", "--recall", "N-1", "--consignee", "A", "--units", "-500").returncode == 2
+
+    # Nothing was written, so a later read still works.
+    assert cli("ship", "--recall", "N-1", "--consignee", "A", "--units", "100").returncode == 0
+    done = cli("reconcile", "--recall", "N-1")
+    assert done.returncode != 0          # still unaccounted for, correctly refused
+    assert "shipped       100" in done.stdout
+
+
+def test_negative_bucket_rejected_and_account_not_filed(cli):
+    cli("ship", "--recall", "N-2", "--consignee", "A", "--units", "100")
+    bad = cli("file", "--recall", "N-2", "--consignee", "A",
+              "--returned", "-10", "--attested-by", "X")
+    assert bad.returncode == 2
+    assert "cannot be negative" in bad.stderr
+
+    # The account was not half-written: reconcile still reads, and reports
+    # no account filed rather than tracebacking.
+    after = cli("reconcile", "--recall", "N-2")
+    assert "Traceback" not in after.stderr
+    assert "no account filed" in after.stdout
+
+
+def test_non_numeric_units_rejected(cli):
+    bad = cli("ship", "--recall", "N-3", "--consignee", "A", "--units", "abc")
+    assert bad.returncode == 2
+    assert "not a whole number of units" in bad.stderr

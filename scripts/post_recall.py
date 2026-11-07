@@ -6,7 +6,7 @@ webhook, so a registered agent posting on its own behalf is how an external
 system reaches a room. The relay states facts from the regulator's record
 and asks the registrar to open the recall; it decides nothing itself.
 
-    python3 scripts/post_recall.py --room recall-nyblad --recall F-0616-2018
+    python3 scripts/post_recall.py --room recall-skinguard --recall D-1572-2020
 
 Add --live to fetch from openFDA instead of the bundled record.
 """
@@ -96,9 +96,9 @@ def notice(record: dict, registrar: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--room", required=True, help="room name, e.g. recall-nyblad")
+    parser.add_argument("--room", required=True, help="room name, e.g. recall-skinguard")
     parser.add_argument("--recall", required=True)
-    parser.add_argument("--registrar", default="nyblad-registrar")
+    parser.add_argument("--registrar", default="skinguard-registrar")
     parser.add_argument("--live", action="store_true")
     args = parser.parse_args()
 

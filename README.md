@@ -38,10 +38,18 @@ were other products and other firms. No published figure attributes harm to
 these 9,600 bottles.
 
 **That ordinariness is the point.** This is a routine Class I recall, and
-even a routine one was closed without anyone recording how many bottles
-came back.
+the public record of it cannot say how many bottles came back.
 
-Because the record cannot say. There is no field for it. I sampled 3,000
+Be precise about this too, because the stronger version would be wrong.
+Somebody does collect the number: under [21 CFR 7.53(b)(4)](https://www.law.cornell.edu/cfr/text/21/7.53)
+a recalling firm is *requested* to file periodic recall status reports with
+its FDA district office giving "the number of products returned or
+corrected by each consignee contacted and the quantity of products
+accounted for", along with the results of its effectiveness checks. So the
+figure exists, on a district office's filing, for recalls where the firm
+filed it.
+
+It is simply not in the record anyone downstream can read. I sampled 3,000
 Class I food recalls through the openFDA API — reproduce it with
 `python3 scripts/survey_recalls.py`:
 
@@ -51,8 +59,18 @@ Class I food recalls through the openFDA API — reproduce it with
   fields that could carry how much came back: NONE
 ```
 
-**86.9% say how much went out. None can say how much came back.** It is not
-missing data. It is a missing concept.
+**86.9% say how much went out. None can say how much came back.** Not a
+field left blank: no field to leave blank. (The first 3,000 records are not
+a random sample; across other slices of the same endpoints the figure runs
+84.5%–87.0%, with drug recalls at 87.0%. The asymmetry does not move.)
+
+That gap is not news to the people who audit this. Reviewing FDA's food
+recall process, GAO recommended the agency "use the same units of measure
+to facilitate calculations of the recovery rate". FDA replied that it "does
+not have the means to currently implement the recommendation", and GAO
+closed the recommendation **Not Implemented**
+([GAO-05-51](https://www.gao.gov/products/gao-05-51)). A federal auditor
+asked for a recovery rate to be computable, and the answer was no.
 
 What that costs, with the caveats a careful reader should have:
 
@@ -160,8 +178,12 @@ room is reproducible by anyone with the repo, and a model that "rounds"
 
 ## Quickstart
 
-No network, no API key, no Switch server, no virtualenv — the engine is
-pure standard library:
+Closeout is two halves, and this is deliberately the smaller one.
+
+The **arithmetic** — what the registrar computes, and the three grounds on
+which it refuses — is kept free of Switch so you can verify it in thirty
+seconds without provisioning anything. No network, no API key, no Switch
+server, no virtualenv; the engine is pure standard library:
 
 ```bash
 git clone https://github.com/ANMOLGUPTA-24/closeout.git
@@ -172,6 +194,14 @@ cd closeout
 It exits non-zero if a recall is ever closed when it should not be, so it
 doubles as an integration test. It walks three refusals, each catching
 something the one before it could not.
+
+The **authority model** is the other half, and it is not reproducible in a
+script: who may file, who may close, and who is structurally unable to read
+whose books are Switch properties, enforced by room membership rather than
+asserted by a prompt. A single channel cannot express it. That half is
+[Why this needs Switch](#why-this-needs-switch) and
+[Running it in Switch](#running-it-in-switch); the recorded demo is where
+you watch Switch refuse, not just the arithmetic.
 
 **Refusal 1 — the numbers do not add up.** Gulf Coast returns 4,800 of
 7,200 bottles and states the recall is complete:
@@ -230,7 +260,7 @@ python3 -m venv .venv && .venv/bin/pip install pytest pyyaml
 .venv/bin/python -m pytest tests/ -q
 ```
 
-53 tests, weighted toward the refusal paths: false completion, overage,
+59 tests, weighted toward the refusal paths: false completion, overage,
 unevidenced counts, disputed returns in both directions, duplicate
 accounts, silence-is-not-completion, a state file written before a field
 existed, a recall number that tries to escape the state directory, and a

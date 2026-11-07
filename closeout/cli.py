@@ -327,6 +327,26 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     return 0
 
 
+def unit_count(text: str) -> int:
+    """A count of physical units: a whole number, never negative.
+
+    Validation also lives in the dataclasses in recon.py, but those only run
+    when a record is read back. A negative written here would be accepted,
+    persisted, and then raise on every later reconcile, close and certificate
+    -- so the recall would be unusable until someone refiled it by hand. A
+    count of product is rejected at the door instead.
+    """
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of units")
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            f"{value} units: a count of product cannot be negative"
+        )
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="closeout", description=__doc__)
     parser.add_argument(
@@ -345,14 +365,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ship", help="record units shipped to a consignee")
     p.add_argument("--recall", required=True)
     p.add_argument("--consignee", required=True)
-    p.add_argument("--units", type=int, required=True)
+    p.add_argument("--units", type=unit_count, required=True)
     p.set_defaults(func=cmd_ship)
 
     p = sub.add_parser("file", help="file a consignee's final account")
     p.add_argument("--recall", required=True)
     p.add_argument("--consignee", required=True)
     for bucket in BUCKETS:
-        p.add_argument(f"--{bucket}", type=int, default=0)
+        p.add_argument(f"--{bucket}", type=unit_count, default=0)
         p.add_argument(
             f"--{bucket}-evidence",
             dest=f"{bucket}_evidence",
@@ -375,7 +395,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--recall", required=True)
     p.add_argument("--consignee", required=True)
-    p.add_argument("--units", type=int, required=True)
+    p.add_argument("--units", type=unit_count, required=True)
     p.set_defaults(func=cmd_receipt)
 
     p = sub.add_parser("close", help="authorize closure (regulatory sign-off)")
@@ -404,7 +424,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (ValueError, TypeError) as exc:
+        # A state file written by an older version, or edited by hand, can
+        # still hold a value the dataclasses reject on read. Say so plainly;
+        # a traceback in front of a regulator is not an error message.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
