@@ -7,3 +7,4 @@ __pycache__/
 vendor/
 console-root/
 tasks/
+video/frames/
