@@ -1,0 +1,34 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      # The engine itself imports nothing outside the standard library. If
+      # that ever stops being true, this is where it should fail.
+      - name: The engine runs on a bare interpreter
+        run: python -c "import closeout.recon, closeout.store, closeout.cli"
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      # The demo is the integration test: it exits non-zero if a recall is
+      # ever closed when it should not be.
+      - name: The demo refuses what it should refuse
+        run: ./scripts/demo.sh
